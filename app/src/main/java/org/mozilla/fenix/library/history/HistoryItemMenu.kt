@@ -24,7 +24,7 @@ class HistoryItemMenu(
         listOf(
             SimpleBrowserMenuItem(
                 context.getString(R.string.history_delete_item),
-                textColorResource = DefaultThemeManager.resolveAttribute(R.attr.deleteColor, context)
+                textColorResource = DefaultThemeManager.resolveAttribute(R.attr.destructive, context)
             ) {
                 onItemTapped.invoke(Item.Delete)
             }

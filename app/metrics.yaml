@@ -19,6 +19,7 @@ events:
     - https://github.com/mozilla-mobile/fenix/pull/1067#issuecomment-474598673
     notification_emails:
     - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   search_bar_tapped:
     type: event
@@ -32,7 +33,7 @@ events:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1067#issuecomment-474598673
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   entered_url:
     type: event
@@ -46,23 +47,28 @@ events:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1067#issuecomment-474598673
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   performed_search:
     type: event
     description: >
       A user performed a search
     extra_keys:
-      search_suggestion:
-        description: "A boolean that tells us whether or not the search term was suggested by the Awesomebar"
-      search_shortcut:
-        description: "A boolean that tells us whether or not the search was conducted through a search shortcut"
+      source:
+        description: >
+          A string that tells us how the user performed the search. Possible values are:
+          * default.action
+          * default.suggestion
+          * shortcut.action
+          * shortcut.suggestion
+
     bugs:
     - 959
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1067#issuecomment-474598673
+    - https://github.com/mozilla-mobile/fenix/pull/1677
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   browser_menu_action:
     type: event
@@ -79,7 +85,7 @@ events:
     data_reviews:
     - TBD
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   ss_menu_opened:
     type: event
@@ -90,7 +96,7 @@ events:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1202#issuecomment-476870449
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   ss_menu_closed:
     type: event
@@ -101,7 +107,7 @@ events:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1202#issuecomment-476870449
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   ss_selected:
     type: event
@@ -115,7 +121,7 @@ events:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1202#issuecomment-476870449
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
 
 crash_reporter:
@@ -128,7 +134,7 @@ crash_reporter:
       data_reviews:
       - TBD
       notification_emails:
-      - telemetry-client-dev@mozilla.com
+      - fenix-core@mozilla.com
       expires: "2020-03-01"
     closed:
       type: event
@@ -142,7 +148,7 @@ crash_reporter:
       data_reviews:
       - TBD
       notification_emails:
-      - telemetry-client-dev@mozilla.com
+      - fenix-core@mozilla.com
       expires: "2020-03-01"
 
 context_menu:
@@ -163,7 +169,7 @@ context_menu:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
 
 find_in_page:
@@ -176,7 +182,7 @@ find_in_page:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   closed:
     type: event
@@ -187,7 +193,7 @@ find_in_page:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   next_result:
     type: event
@@ -198,7 +204,7 @@ find_in_page:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   previous_result:
     type: event
@@ -209,7 +215,7 @@ find_in_page:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   searched_page:
     type: event
@@ -220,7 +226,7 @@ find_in_page:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1344#issuecomment-479285010
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
 
 quick_action_sheet:
@@ -233,7 +239,7 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   closed:
     type: event
@@ -244,7 +250,8 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   share_tapped:
     type: event
@@ -255,7 +262,7 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   bookmark_tapped:
     type: event
@@ -266,7 +273,7 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   download_tapped:
     type: event
@@ -277,7 +284,7 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
   read_tapped:
     type: event
@@ -288,7 +295,7 @@ quick_action_sheet:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1362#issuecomment-479668466
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
     expires: "2020-03-01"
 
 metrics:
@@ -303,5 +310,232 @@ metrics:
     data_reviews:
     - https://github.com/mozilla-mobile/fenix/pull/1067#issuecomment-474598673
     notification_emails:
-    - telemetry-client-dev@mozilla.com
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  search_count:
+    type: labeled_counter
+    description: >
+      The labels for this counter are `<search-engine-name>.<source>`.
+
+      If the search engine is bundled with Fenix `search-engine-name` will be the name of the search engine. If it's a
+      custom search engine (defined: https://github.com/mozilla-mobile/fenix/issues/1607) the value will be `custom`.
+
+      `source` will either be `action` or `suggestion`
+    send_in_pings:
+    - metrics
+    bugs:
+    - 1158
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1677
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2019-09-01"
+
+search.default_engine:
+  code:
+    type: string
+    description: >
+      If the search engine is pre-loaded with Fenix this value
+      will be the search engine identifier. If it's a custom search engine
+      (defined: https://github.com/mozilla-mobile/fenix/issues/1607) the
+      value will be "custom"
+    send_in_pings:
+    - metrics
+    bugs:
+    - 800
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/issues/1607
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2019-09-01"
+  name:
+    type: string
+    description: >
+      If the search engine is pre-loaded with Fenix this value
+      will be the search engine name. If it's a custom search engine
+      (defined: https://github.com/mozilla-mobile/fenix/issues/1607) the
+      value will be "custom"
+    send_in_pings:
+    - metrics
+    bugs:
+    - 800
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/issues/1607
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2019-09-01"
+  submission_url:
+    type: string
+    description: >
+      If the search engine is pre-loaded with Fenix this value
+      will be he base URL we use to build the search query for the search engine.
+      For example: https://mysearchengine.com/?query=%s. If it's a custom search engine
+      (defined: https://github.com/mozilla-mobile/fenix/issues/1607) the
+      value will be "custom"
+    send_in_pings:
+    - metrics
+    bugs:
+    - 800
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/issues/1607
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2019-09-01"
+
+bookmarks_management:
+  open_in_new_tab:
+    type: event
+    description: >
+      A user opened a bookmark in a new tab.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  open_in_new_tabs:
+    type: event
+    description: >
+      A user opened multiple bookmarks at once in new tabs.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  open_in_private_tab:
+    type: event
+    description: >
+      A user opened a bookmark in a new private tab.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  open_in_private_tabs:
+    type: event
+    description: >
+      A user opened multiple bookmarks at once in new private tabs.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  edited:
+    type: event
+    description: >
+      A user edited the title and/or URL of an existing bookmark.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  moved:
+    type: event
+    description: >
+      A user moved an existing bookmark or folder to another folder.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  removed:
+    type: event
+    description: >
+      A user removed a bookmark item.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  multi_removed:
+    type: event
+    description: >
+      A user removed multiple bookmarks at once.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  shared:
+    type: event
+    description: >
+      A user shared a bookmark.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  copied:
+    type: event
+    description: >
+      A user copied a bookmark.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  folder_add:
+    type: event
+    description: >
+      A user added a new bookmark folder.
+    bugs:
+    - 974
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1708
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+
+custom_tab:
+  closed:
+    type: event
+    description: >
+      A user closed the custom tab
+    bugs:
+    - 977
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1697
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  action_button:
+    type: event
+    description: >
+      A user pressed the action button provided by the launching app
+    bugs:
+    - 977
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1697
+    notification_emails:
+    - fenix-core@mozilla.com
+    expires: "2020-03-01"
+  menu:
+    type: event
+    description: >
+      A user opened the custom tabs menu
+    bugs:
+    - 977
+    data_reviews:
+    - https://github.com/mozilla-mobile/fenix/pull/1697
+    notification_emails:
+    - fenix-core@mozilla.com
     expires: "2020-03-01"

@@ -5,6 +5,9 @@
 package org.mozilla.fenix.settings
 
 import android.content.Context
+import android.view.View
+import android.widget.TextView
+import androidx.core.text.HtmlCompat
 import mozilla.components.feature.sitepermissions.SitePermissions
 import mozilla.components.feature.sitepermissions.SitePermissionsRules
 import org.mozilla.fenix.R
@@ -15,7 +18,7 @@ internal fun SitePermissionsRules.Action.toString(context: Context): String {
             context.getString(R.string.preference_option_phone_feature_ask_to_allow)
         }
         SitePermissionsRules.Action.BLOCKED -> {
-            context.getString(R.string.preference_option_phone_feature_block)
+            context.getString(R.string.preference_option_phone_feature_blocked)
         }
     }
 }
@@ -23,13 +26,87 @@ internal fun SitePermissionsRules.Action.toString(context: Context): String {
 internal fun SitePermissions.Status.toString(context: Context): String {
     return when (this) {
         SitePermissions.Status.BLOCKED -> {
-            context.getString(R.string.preference_option_phone_feature_block)
+            context.getString(R.string.preference_option_phone_feature_blocked)
         }
         SitePermissions.Status.NO_DECISION -> {
             context.getString(R.string.preference_option_phone_feature_ask_to_allow)
         }
         SitePermissions.Status.ALLOWED -> {
-            context.getString(R.string.phone_feature_no_decision)
+            context.getString(R.string.preference_option_phone_feature_allowed)
         }
+    }
+}
+
+fun SitePermissionsRules.Action.toStatus(): SitePermissions.Status {
+    return when (this) {
+        SitePermissionsRules.Action.BLOCKED -> SitePermissions.Status.BLOCKED
+        SitePermissionsRules.Action.ASK_TO_ALLOW -> SitePermissions.Status.NO_DECISION
+    }
+}
+
+fun SitePermissions.Status.toggle(): SitePermissions.Status {
+    return when (this) {
+        SitePermissions.Status.BLOCKED -> SitePermissions.Status.ALLOWED
+        SitePermissions.Status.NO_DECISION -> SitePermissions.Status.ALLOWED
+        SitePermissions.Status.ALLOWED -> SitePermissions.Status.BLOCKED
+    }
+}
+
+fun SitePermissions.toggle(featurePhone: PhoneFeature): SitePermissions {
+    return when (featurePhone) {
+        PhoneFeature.CAMERA -> {
+            copy(
+                camera = camera.toggle()
+            )
+        }
+        PhoneFeature.LOCATION -> {
+            copy(
+                location = location.toggle()
+            )
+        }
+        PhoneFeature.MICROPHONE -> {
+            copy(
+                microphone = microphone.toggle()
+            )
+        }
+        PhoneFeature.NOTIFICATION -> {
+            copy(
+                notification = notification.toggle()
+            )
+        }
+    }
+}
+
+fun PhoneFeature.getLabel(context: Context): String {
+    return when (this) {
+        PhoneFeature.CAMERA -> context.getString(R.string.preference_phone_feature_camera)
+        PhoneFeature.LOCATION -> context.getString(R.string.preference_phone_feature_location)
+        PhoneFeature.MICROPHONE -> context.getString(R.string.preference_phone_feature_microphone)
+        PhoneFeature.NOTIFICATION -> context.getString(R.string.preference_phone_feature_notification)
+    }
+}
+
+fun PhoneFeature.getPreferenceKey(context: Context): String {
+    return when (this) {
+        PhoneFeature.CAMERA -> context.getString(R.string.pref_key_phone_feature_camera)
+        PhoneFeature.LOCATION -> context.getString(R.string.pref_key_phone_feature_location)
+        PhoneFeature.MICROPHONE -> context.getString(R.string.pref_key_phone_feature_microphone)
+        PhoneFeature.NOTIFICATION -> context.getString(R.string.pref_key_phone_feature_notification)
+    }
+}
+
+fun initBlockedByAndroidView(phoneFeature: PhoneFeature, blockedByAndroidView: View) {
+    val context = blockedByAndroidView.context
+    if (!phoneFeature.isAndroidPermissionGranted(context)) {
+        blockedByAndroidView.visibility = View.VISIBLE
+
+        val descriptionLabel = blockedByAndroidView.findViewById<TextView>(R.id.blocked_by_android_explanation_label)
+        val text = context.getString(
+            R.string.phone_feature_blocked_by_android_explanation,
+            phoneFeature.getLabel(context)
+        )
+        descriptionLabel.text = HtmlCompat.fromHtml(text, HtmlCompat.FROM_HTML_MODE_COMPACT)
+    } else {
+        blockedByAndroidView.visibility = View.GONE
     }
 }

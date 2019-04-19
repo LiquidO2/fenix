@@ -5,16 +5,18 @@ package org.mozilla.fenix.components.metrics
 
 import android.content.Context
 import mozilla.components.service.glean.Glean
-import mozilla.components.service.glean.metrics.NoExtraKeys
+import mozilla.components.service.glean.private.NoExtraKeys
 import mozilla.components.support.utils.Browsers
-import org.mozilla.fenix.BuildConfig
+import org.mozilla.fenix.GleanMetrics.BookmarksManagement
+import org.mozilla.fenix.GleanMetrics.ContextMenu
 import org.mozilla.fenix.GleanMetrics.CrashReporter
+import org.mozilla.fenix.GleanMetrics.CustomTab
 import org.mozilla.fenix.GleanMetrics.Events
 import org.mozilla.fenix.GleanMetrics.FindInPage
-import org.mozilla.fenix.GleanMetrics.ContextMenu
-import org.mozilla.fenix.GleanMetrics.QuickActionSheet
 import org.mozilla.fenix.GleanMetrics.Metrics
-import org.mozilla.fenix.utils.Settings
+import org.mozilla.fenix.GleanMetrics.QuickActionSheet
+import org.mozilla.fenix.GleanMetrics.SearchDefaultEngine
+import org.mozilla.fenix.ext.components
 
 private class EventWrapper<T : Enum<T>>(
     private val recorder: ((Map<T, String>?) -> Unit),
@@ -52,7 +54,10 @@ private val Event.wrapper
             { Events.enteredUrlKeys.valueOf(it) }
         )
         is Event.PerformedSearch -> EventWrapper(
-            { Events.performedSearch.record(it) },
+            {
+                Metrics.searchCount[this.eventSource.countLabel].add(1)
+                Events.performedSearch.record(it)
+            },
             { Events.performedSearchKeys.valueOf(it) }
         )
         is Event.FindInPageOpened -> EventWrapper<NoExtraKeys>(
@@ -103,19 +108,79 @@ private val Event.wrapper
         is Event.QuickActionSheetReadTapped -> EventWrapper<NoExtraKeys>(
             { QuickActionSheet.readTapped.record(it) }
         )
+        is Event.OpenedBookmarkInNewTab -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.openInNewTab.record(it) }
+        )
+        is Event.OpenedBookmarksInNewTabs -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.openInNewTabs.record(it) }
+        )
+        is Event.OpenedBookmarkInPrivateTab -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.openInPrivateTab.record(it) }
+        )
+        is Event.OpenedBookmarksInPrivateTabs -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.openInPrivateTabs.record(it) }
+        )
+        is Event.EditedBookmark -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.edited.record(it) }
+        )
+        is Event.MovedBookmark -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.moved.record(it) }
+        )
+        is Event.RemoveBookmark -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.removed.record(it) }
+        )
+        is Event.RemoveBookmarks -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.multiRemoved.record(it) }
+        )
+        is Event.ShareBookmark -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.shared.record(it) }
+        )
+        is Event.CopyBookmark -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.copied.record(it) }
+        )
+        is Event.AddBookmarkFolder -> EventWrapper<NoExtraKeys>(
+            { BookmarksManagement.folderAdd.record(it) }
+        )
+        is Event.CustomTabsMenuOpened -> EventWrapper<NoExtraKeys>(
+            { CustomTab.menu.record(it) }
+        )
+        is Event.CustomTabsActionTapped -> EventWrapper<NoExtraKeys>(
+            { CustomTab.actionButton.record(it) }
+        )
+        is Event.CustomTabsClosed -> EventWrapper<NoExtraKeys>(
+            { CustomTab.closed.record(it) }
+        )
 
         // Don't track other events with Glean
         else -> null
     }
 
 class GleanMetricsService(private val context: Context) : MetricsService {
+    private var initialized = false
+
     override fun start() {
+        Glean.setUploadEnabled(true)
+        if (initialized) return
+
         Glean.initialize(context)
-        Glean.setUploadEnabled(IsGleanEnabled)
 
         Metrics.apply {
             defaultBrowser.set(Browsers.all(context).isDefaultBrowser)
         }
+
+        SearchDefaultEngine.apply {
+            val defaultEngine = context
+                .components
+                .search
+                .searchEngineManager
+                .defaultSearchEngine ?: return@apply
+
+            code.set(defaultEngine.identifier)
+            name.set(defaultEngine.name)
+            submissionUrl.set(defaultEngine.buildSearchUrl(""))
+        }
+
+        initialized = true
     }
 
     override fun stop() {
@@ -127,10 +192,6 @@ class GleanMetricsService(private val context: Context) : MetricsService {
     }
 
     override fun shouldTrack(event: Event): Boolean {
-        return Settings.getInstance(context).isTelemetryEnabled && event.wrapper != null
-    }
-
-    companion object {
-        private const val IsGleanEnabled = BuildConfig.TELEMETRY
+        return event.wrapper != null
     }
 }

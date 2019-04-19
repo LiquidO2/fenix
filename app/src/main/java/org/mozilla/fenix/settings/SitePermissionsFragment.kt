@@ -5,7 +5,6 @@
 package org.mozilla.fenix.settings
 
 import android.os.Bundle
-import android.preference.PreferenceManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.Navigation
 import androidx.preference.Preference
@@ -21,12 +20,9 @@ import org.mozilla.fenix.utils.Settings
 @SuppressWarnings("TooManyFunctions")
 class SitePermissionsFragment : PreferenceFragmentCompat() {
 
-    private lateinit var categoryPhoneFeatures: Preference
-    private lateinit var radioRecommendSettings: RadioButtonPreference
-    private lateinit var radioCustomSettings: RadioButtonPreference
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        (activity as AppCompatActivity).title = getString(R.string.preferences_site_permissions)
         (activity as AppCompatActivity).supportActionBar?.show()
     }
 
@@ -41,49 +37,22 @@ class SitePermissionsFragment : PreferenceFragmentCompat() {
 
     private fun setupPreferences() {
 
-        bindRadioRecommendedSettings()
-
-        bindRadioCustomSettings()
-
         bindCategoryPhoneFeatures()
-
-        setupRadioGroups()
+        bindExceptions()
     }
 
-    private fun setupRadioGroups() {
-        radioRecommendSettings.addToRadioGroup(radioCustomSettings)
-        radioCustomSettings.addToRadioGroup(radioRecommendSettings)
-    }
+    private fun bindExceptions() {
+        val keyExceptions = getString(R.string.pref_key_show_site_exceptions)
+        val exceptionsCategory = requireNotNull<Preference>(findPreference(keyExceptions))
 
-    private fun bindRadioCustomSettings() {
-        val keyCustomSettings = getString(R.string.pref_key_custom_settings)
-        radioCustomSettings = requireNotNull(findPreference(keyCustomSettings))
-
-        radioCustomSettings.onClickListener {
-            categoryPhoneFeatures.isVisible = true
-        }
-    }
-
-    private fun bindRadioRecommendedSettings() {
-        val keyRecommendSettings = getString(R.string.pref_key_recommended_settings)
-        radioRecommendSettings = requireNotNull(findPreference(keyRecommendSettings))
-
-        radioRecommendSettings.onClickListener {
-            categoryPhoneFeatures.isVisible = false
+        exceptionsCategory.onPreferenceClickListener = OnPreferenceClickListener {
+            val directions = SitePermissionsFragmentDirections.actionSitePermissionsToExceptions()
+            Navigation.findNavController(view!!).navigate(directions)
+            true
         }
     }
 
     private fun bindCategoryPhoneFeatures() {
-        val keyCategoryPhoneFeatures = getString(R.string.pref_key_category_phone_feature)
-
-        categoryPhoneFeatures = requireNotNull(findPreference(keyCategoryPhoneFeatures))
-
-        val isCategoryActivate = PreferenceManager.getDefaultSharedPreferences(requireContext())
-            .getBoolean(radioCustomSettings.key, false)
-        if (isCategoryActivate) {
-            categoryPhoneFeatures.isVisible = true
-        }
-
         val settings = Settings.getInstance(requireContext())
 
         val cameraAction = settings
@@ -109,22 +78,13 @@ class SitePermissionsFragment : PreferenceFragmentCompat() {
     }
 
     private fun initPhoneFeature(phoneFeature: PhoneFeature, summary: String) {
-        val keyPreference = getPreferenceKeyBy(phoneFeature)
+        val keyPreference = phoneFeature.getPreferenceKey(requireContext())
         val cameraPhoneFeatures: Preference = requireNotNull(findPreference(keyPreference))
         cameraPhoneFeatures.summary = summary
 
         cameraPhoneFeatures.onPreferenceClickListener = OnPreferenceClickListener {
             navigateToPhoneFeature(phoneFeature)
             true
-        }
-    }
-
-    private fun getPreferenceKeyBy(phoneFeature: PhoneFeature): String {
-        return when (phoneFeature) {
-            CAMERA -> getString(R.string.pref_key_phone_feature_camera)
-            LOCATION -> getString(R.string.pref_key_phone_feature_location)
-            MICROPHONE -> getString(R.string.pref_key_phone_feature_microphone)
-            NOTIFICATION -> getString(R.string.pref_key_phone_feature_notification)
         }
     }
 

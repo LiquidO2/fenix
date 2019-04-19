@@ -8,6 +8,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.content.ContextCompat
 import io.reactivex.Observable
 import io.reactivex.Observer
 import io.reactivex.functions.Consumer
@@ -16,6 +17,7 @@ import mozilla.components.browser.toolbar.BrowserToolbar
 import mozilla.components.support.ktx.android.content.res.pxToDp
 import org.jetbrains.anko.backgroundDrawable
 import org.mozilla.fenix.R
+import org.mozilla.fenix.customtabs.CustomTabToolbarMenu
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.mvi.UIView
 
@@ -41,18 +43,27 @@ class ToolbarUIView(
         .inflate(R.layout.layout_url_background, container, false)
 
     init {
+        val session = sessionId?.let { view.context.components.core.sessionManager.findSessionById(sessionId) }
+            ?: view.context.components.core.sessionManager.selectedSession
+
         view.apply {
             setOnUrlCommitListener {
                 actionEmitter.onNext(SearchAction.UrlCommitted(it, sessionId, state?.engine))
             false
             }
             onUrlClicked = {
-                actionEmitter.onNext(SearchAction.ToolbarTapped)
+                actionEmitter.onNext(SearchAction.ToolbarClicked)
                 false
             }
 
             browserActionMargin = resources.pxToDp(browserActionMarginDp)
-            urlBoxView = urlBackground
+
+            val isCustomTabSession = (session?.isCustomTabSession() == true)
+
+            urlBoxView = if (isCustomTabSession) { null } else urlBackground
+            progressBarGravity = if (isCustomTabSession) { PROGRESS_BOTTOM } else PROGRESS_TOP
+
+            textColor = ContextCompat.getColor(context, R.color.photonGrey30)
 
             hint = context.getString(R.string.search_hint)
 
@@ -66,20 +77,33 @@ class ToolbarUIView(
                     actionEmitter.onNext(SearchAction.TextChanged(text))
                 }
             })
+
+            setOnUrlLongClickListener {
+                actionEmitter.onNext(SearchAction.ToolbarLongClicked)
+                true
+            }
         }
 
         with(view.context) {
-            val session = sessionId?.let { components.core.sessionManager.findSessionById(sessionId) }
-                ?: components.core.sessionManager.selectedSession
+            val isCustom = session?.isCustomTabSession() ?: false
+
+            val menuToolbar = if (isCustom) {
+                CustomTabToolbarMenu(this,
+                    requestDesktopStateProvider = { session?.desktopMode ?: false },
+                    onItemTapped = { actionEmitter.onNext(SearchAction.ToolbarMenuItemTapped(it)) }
+                )
+            } else {
+                DefaultToolbarMenu(this,
+                    sessionId = sessionId,
+                    requestDesktopStateProvider = { session?.desktopMode ?: false },
+                    onItemTapped = { actionEmitter.onNext(SearchAction.ToolbarMenuItemTapped(it)) }
+                )
+            }
 
             toolbarIntegration = ToolbarIntegration(
                 this,
                 view,
-                ToolbarMenu(this,
-                    sessionId = sessionId,
-                    requestDesktopStateProvider = { session?.desktopMode ?: false },
-                    onItemTapped = { actionEmitter.onNext(SearchAction.ToolbarMenuItemTapped(it)) }
-                ),
+                menuToolbar,
                 ShippedDomainsProvider().also { it.initialize(this) },
                 components.core.historyStorage,
                 components.core.sessionManager,
@@ -148,6 +172,8 @@ class ToolbarUIView(
     }
 
     companion object {
+        private const val PROGRESS_BOTTOM = 0
+        private const val PROGRESS_TOP = 1
         const val browserActionMarginDp = 8
     }
 }

@@ -32,8 +32,9 @@ fun Activity.setTheme(theme: ThemeManager.Theme) {
 
 fun ThemeManager.Theme.isPrivate(): Boolean = this == ThemeManager.Theme.Private
 
-private var temporaryThemeManagerStorage = ThemeManager.Theme.Normal
 class DefaultThemeManager : ThemeManager {
+    var temporaryThemeManagerStorage = ThemeManager.Theme.Normal
+
     var onThemeChange: ((ThemeManager.Theme) -> Unit)? = null
 
     override val currentTheme: ThemeManager.Theme
@@ -119,13 +120,13 @@ class DefaultThemeManager : ThemeManager {
                 window.navigationBarColor = ContextCompat
                     .getColor(
                         context, DefaultThemeManager
-                            .resolveAttribute(R.attr.navigationBarColorHome, context)
+                            .resolveAttribute(R.attr.foundation, context)
                     )
             } else {
                 window.navigationBarColor = ContextCompat
                     .getColor(
                         context, DefaultThemeManager
-                            .resolveAttribute(R.attr.navigationBarColorBrowser, context)
+                            .resolveAttribute(R.attr.foundation, context)
                     )
             }
         }

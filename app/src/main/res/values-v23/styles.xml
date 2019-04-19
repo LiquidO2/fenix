@@ -9,16 +9,19 @@
             sure we also get them in 27+ -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">@bool/theme_is_light</item>
+
+        <!-- Style the navigation bar -->
+        <item name="android:navigationBarColor">?foundation</item>
     </style>
 
     <style name="PrivateTheme" parent="PrivateThemeBase">
         <!-- Style the status bar -->
         <!-- We have to pull in the changes from v23/styles.xml to make
             sure we also get them in 27+ -->
-        <item name="android:statusBarColor">@color/private_browsing_top_gradient</item>
+        <item name="android:statusBarColor">@color/above_private_theme</item>
         <item name="android:windowLightStatusBar">false</item>
 
         <!-- Style the navigation bar -->
-        <item name="android:navigationBarColor">@color/private_browsing_bottom_gradient</item>
+        <item name="android:navigationBarColor">?foundation</item>
     </style>
 </resources>

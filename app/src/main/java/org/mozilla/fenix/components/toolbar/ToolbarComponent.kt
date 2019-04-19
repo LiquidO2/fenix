@@ -36,7 +36,6 @@ class ToolbarComponent(
 
     override val reducer: Reducer<SearchState, SearchChange> = { state, change ->
         when (change) {
-            is SearchChange.QueryChanged -> state.copy(query = change.query)
             is SearchChange.SearchShortcutEngineSelected ->
                 state.copy(engine = change.engine)
         }
@@ -59,15 +58,15 @@ class ToolbarComponent(
     private fun applyTheme() {
         getView().suggestionBackgroundColor = ContextCompat.getColor(
             container.context,
-            DefaultThemeManager.resolveAttribute(R.attr.suggestionBackground, container.context)
+            R.color.suggestion_highlight_color
         )
         getView().textColor = ContextCompat.getColor(
             container.context,
-            DefaultThemeManager.resolveAttribute(R.attr.awesomeBarTitleTextColor, container.context)
+            DefaultThemeManager.resolveAttribute(R.attr.primaryText, container.context)
         )
         getView().hintColor = ContextCompat.getColor(
             container.context,
-            DefaultThemeManager.resolveAttribute(R.attr.awesomeBarDescriptionTextColor, container.context)
+            DefaultThemeManager.resolveAttribute(R.attr.secondaryText, container.context)
         )
     }
 }
@@ -81,12 +80,12 @@ data class SearchState(
 sealed class SearchAction : Action {
     data class UrlCommitted(val url: String, val session: String?, val engine: SearchEngine? = null) : SearchAction()
     data class TextChanged(val query: String) : SearchAction()
-    object ToolbarTapped : SearchAction()
+    object ToolbarClicked : SearchAction()
+    object ToolbarLongClicked : SearchAction()
     data class ToolbarMenuItemTapped(val item: ToolbarMenu.Item) : SearchAction()
     object EditingCanceled : SearchAction()
 }
 
 sealed class SearchChange : Change {
-    data class QueryChanged(val query: String) : SearchChange()
     data class SearchShortcutEngineSelected(val engine: SearchEngine) : SearchChange()
 }

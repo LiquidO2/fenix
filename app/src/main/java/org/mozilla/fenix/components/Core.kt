@@ -5,10 +5,8 @@
 package org.mozilla.fenix.components
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
-import android.preference.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -25,7 +23,6 @@ import mozilla.components.concept.engine.EngineSession.TrackingProtectionPolicy
 import mozilla.components.concept.engine.mediaquery.PreferredColorScheme
 import mozilla.components.concept.fetch.Client
 import mozilla.components.feature.session.HistoryDelegate
-import mozilla.components.feature.session.bundling.SessionBundleStorage
 import mozilla.components.lib.crash.handler.CrashHandlerService
 import org.mozilla.fenix.AppRequestInterceptor
 import org.mozilla.fenix.utils.Settings
@@ -43,6 +40,7 @@ class Core(private val context: Context) {
 
         testConfig?.let {
             builder.extras(it)
+                .remoteDebuggingEnabled(true)
         }
 
         val runtimeSettings = builder
@@ -59,14 +57,13 @@ class Core(private val context: Context) {
      * configuration (see build variants).
      */
     val engine: Engine by lazy {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-
         val defaultSettings = DefaultSettings(
             requestInterceptor = AppRequestInterceptor(context),
             remoteDebuggingEnabled = Settings.getInstance(context).isRemoteDebuggingEnabled,
             testingModeEnabled = false,
-            trackingProtectionPolicy = createTrackingProtectionPolicy(prefs),
-            historyTrackingDelegate = HistoryDelegate(historyStorage)
+            trackingProtectionPolicy = createTrackingProtectionPolicy(),
+            historyTrackingDelegate = HistoryDelegate(historyStorage),
+            preferredColorScheme = getPreferredColorScheme()
         )
 
         GeckoEngine(context, defaultSettings, runtime)
@@ -79,9 +76,8 @@ class Core(private val context: Context) {
         GeckoViewFetchClient(context, runtime)
     }
 
-    val sessionStorage: SessionBundleStorage by lazy {
-        SessionBundleStorage(context, bundleLifetime = Pair(BUNDLE_LIFETIME_IN_MINUTES, TimeUnit.MINUTES),
-            engine = engine)
+    val sessionStorage: SessionStorage by lazy {
+        SessionStorage(context, engine = engine)
     }
 
     /**
@@ -95,7 +91,7 @@ class Core(private val context: Context) {
             // Restore a previous, still active bundle.
             GlobalScope.launch(Dispatchers.Main) {
                 val snapshot = async(Dispatchers.IO) {
-                    sessionStorage.restore()?.restoreSnapshot()
+                    sessionStorage.restore()
                 }
 
                 // There's an active bundle with a snapshot: Feed it into the SessionManager.
@@ -114,7 +110,6 @@ class Core(private val context: Context) {
                         .periodicallyInForeground(interval = 30, unit = TimeUnit.SECONDS)
                         .whenGoingToBackground()
                         .whenSessionsChange()
-                    autoClose(sessionManager)
                 }
             }
         }
@@ -132,8 +127,6 @@ class Core(private val context: Context) {
     /**
      * Constructs a [TrackingProtectionPolicy] based on current preferences.
      *
-     * @param prefs the shared preferences to use when reading tracking
-     * protection settings.
      * @param normalMode whether or not tracking protection should be enabled
      * in normal browsing mode, defaults to the current preference value.
      * @param privateMode whether or not tracking protection should be enabled
@@ -141,15 +134,19 @@ class Core(private val context: Context) {
      * @return the constructed tracking protection policy based on preferences.
      */
     fun createTrackingProtectionPolicy(
-        prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context),
-        normalMode: Boolean = true,
+        normalMode: Boolean = Settings.getInstance(context).shouldUseTrackingProtection,
         privateMode: Boolean = true
     ): TrackingProtectionPolicy {
+        val trackingProtectionPolicy = TrackingProtectionPolicy.select(
+            TrackingProtectionPolicy.AD,
+            TrackingProtectionPolicy.ANALYTICS,
+            TrackingProtectionPolicy.SOCIAL
+        )
 
         return when {
-            normalMode && privateMode -> TrackingProtectionPolicy.all()
-            normalMode && !privateMode -> TrackingProtectionPolicy.all().forRegularSessionsOnly()
-            !normalMode && privateMode -> TrackingProtectionPolicy.all().forPrivateSessionsOnly()
+            normalMode && privateMode -> trackingProtectionPolicy
+            normalMode && !privateMode -> trackingProtectionPolicy.forRegularSessionsOnly()
+            !normalMode && privateMode -> trackingProtectionPolicy.forPrivateSessionsOnly()
             else -> TrackingProtectionPolicy.none()
         }
     }
@@ -157,19 +154,15 @@ class Core(private val context: Context) {
     /**
      * Sets Preferred Color scheme based on Dark/Light Theme Settings or Current Configuration
      */
-    fun setEnginePreferredColorScheme() {
+    fun getPreferredColorScheme(): PreferredColorScheme {
         val inDark =
             (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
                     Configuration.UI_MODE_NIGHT_YES
-        engine.settings.preferredColorScheme = when {
+        return when {
             Settings.getInstance(context).shouldUseDarkTheme -> PreferredColorScheme.Dark
             Settings.getInstance(context).shouldUseLightTheme -> PreferredColorScheme.Light
             inDark -> PreferredColorScheme.Dark
             else -> PreferredColorScheme.Light
         }
-    }
-
-    companion object {
-        private const val BUNDLE_LIFETIME_IN_MINUTES = 5L
     }
 }

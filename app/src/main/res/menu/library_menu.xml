@@ -6,16 +6,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
     <item
-        android:id="@+id/librarySearch"
-        android:icon="@drawable/ic_search"
-        android:iconTint="?attr/iconColor"
-        android:title="@string/library_search"
-        app:showAsAction="ifRoom"
-        tools:targetApi="o" />
-    <item
         android:id="@+id/libraryClose"
         android:icon="@drawable/ic_close"
-        android:iconTint="?attr/iconColor"
+        android:iconTint="?primaryText"
         android:title="@string/content_description_close_button"
         app:showAsAction="ifRoom"
         tools:targetApi="o" />

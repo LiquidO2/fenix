@@ -5,6 +5,8 @@
 package org.mozilla.fenix.components.toolbar
 
 import android.content.Context
+import android.graphics.PorterDuff
+import androidx.core.content.ContextCompat
 import androidx.navigation.Navigation
 import mozilla.components.browser.domains.autocomplete.DomainAutocompleteProvider
 import mozilla.components.browser.session.SessionManager
@@ -12,8 +14,12 @@ import mozilla.components.browser.session.runWithSession
 import mozilla.components.browser.toolbar.BrowserToolbar
 import mozilla.components.concept.storage.HistoryStorage
 import mozilla.components.feature.toolbar.ToolbarAutocompleteFeature
+import mozilla.components.feature.toolbar.ToolbarFeature
 import mozilla.components.feature.toolbar.ToolbarPresenter
+import mozilla.components.lib.publicsuffixlist.PublicSuffixList
 import mozilla.components.support.base.feature.LifecycleAwareFeature
+import org.mozilla.fenix.DefaultThemeManager
+import org.mozilla.fenix.R
 import org.mozilla.fenix.browser.BrowserFragmentDirections
 import org.mozilla.fenix.ext.components
 
@@ -27,6 +33,9 @@ class ToolbarIntegration(
     sessionId: String? = null,
     isPrivate: Boolean
 ) : LifecycleAwareFeature {
+
+    private var renderStyle: ToolbarFeature.RenderStyle = ToolbarFeature.RenderStyle.UncoloredUrl
+
     init {
         toolbar.setMenuBuilder(toolbarMenu.menuBuilder)
         toolbar.private = isPrivate
@@ -35,14 +44,42 @@ class ToolbarIntegration(
             sessionManager.runWithSession(sessionId) {
                 it.isCustomTabSession()
             }.also { isCustomTab ->
-                if (isCustomTab) return@run
+                if (isCustomTab) {
+                    renderStyle = ToolbarFeature.RenderStyle.RegistrableDomain
+                    return@run
+                }
+
+                if (isPrivate) {
+                    val deleteIcon = context.getDrawable(R.drawable.ic_delete)
+                    deleteIcon?.setColorFilter(
+                        ContextCompat.getColor(
+                            context,
+                            DefaultThemeManager.resolveAttribute(R.attr.primaryText, context)
+                        ), PorterDuff.Mode.SRC_IN
+                    )
+                    deleteIcon?.let {
+                        val deleteSessions = BrowserToolbar.Button(
+                            deleteIcon,
+                            context.getString(R.string.private_browsing_delete_session),
+                            listener = {
+                                context.components.useCases.tabsUseCases.removeAllTabsOfType.invoke(
+                                    private = true
+                                )
+                                Navigation.findNavController(toolbar)
+                                    .navigate(BrowserFragmentDirections.actionBrowserFragmentToHomeFragment())
+                            }
+                        )
+                        toolbar.addNavigationAction(deleteSessions)
+                    }
+                }
 
                 val tabsAction = TabCounterToolbarButton(
                     sessionManager,
-                    showTabs = {
+                    {
                         Navigation.findNavController(toolbar)
                             .navigate(BrowserFragmentDirections.actionBrowserFragmentToHomeFragment())
-                    }
+                    },
+                    isPrivate
                 )
                 toolbar.addBrowserAction(tabsAction)
             }
@@ -57,7 +94,9 @@ class ToolbarIntegration(
     private val toolbarPresenter: ToolbarPresenter = ToolbarPresenter(
         toolbar,
         context.components.core.sessionManager,
-        sessionId
+        sessionId,
+        ToolbarFeature.UrlRenderConfiguration(PublicSuffixList(context),
+            DefaultThemeManager.resolveAttribute(R.attr.primaryText, context), renderStyle = renderStyle)
     )
 
     override fun start() {

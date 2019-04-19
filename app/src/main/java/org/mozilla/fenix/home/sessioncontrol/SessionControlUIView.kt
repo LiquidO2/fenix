@@ -13,31 +13,24 @@ import io.reactivex.Observer
 import io.reactivex.functions.Consumer
 import org.mozilla.fenix.R
 import org.mozilla.fenix.mvi.UIView
+import androidx.recyclerview.widget.ItemTouchHelper
 
 // Convert HomeState into a data structure HomeAdapter understands
 @SuppressWarnings("ComplexMethod")
 private fun SessionControlState.toAdapterList(): List<AdapterItem> {
     val items = mutableListOf<AdapterItem>()
+    items.add(AdapterItem.TabHeader)
 
     if (tabs.isNotEmpty()) {
-        items.add(AdapterItem.TabHeader)
-        tabs.map(AdapterItem::TabItem).forEach { items.add(it) }
+        tabs.reversed().map(AdapterItem::TabItem).forEach { items.add(it) }
         if (mode == Mode.Private) {
-            items.add(AdapterItem.ArchiveTabs)
+            items.add(AdapterItem.DeleteTabs)
         }
     } else {
-        if (mode == Mode.Private) {
-            items.add(AdapterItem.PrivateBrowsingDescription)
-        }
-    }
+        val item = if (mode == Mode.Private) AdapterItem.PrivateBrowsingDescription
+                    else AdapterItem.NoTabMessage
 
-    if (mode == Mode.Private) { return items }
-
-    if (archivedSessions.isNotEmpty()) {
-        items.add(AdapterItem.SessionHeader)
-        archivedSessions.map(AdapterItem::SessionItem).forEach { items.add(it) }
-    } else {
-        items.add(AdapterItem.SessionPlaceholder)
+        items.add(item)
     }
 
     return items
@@ -55,7 +48,7 @@ class SessionControlUIView(
     ) {
 
     override val view: RecyclerView = LayoutInflater.from(container.context)
-        .inflate(R.layout.component_home, container, true)
+        .inflate(R.layout.component_session_control, container, true)
         .findViewById(R.id.home_component)
 
     private val sessionControlAdapter = SessionControlAdapter(actionEmitter)
@@ -64,6 +57,13 @@ class SessionControlUIView(
         view.apply {
             adapter = sessionControlAdapter
             layoutManager = LinearLayoutManager(container.context)
+            val itemTouchHelper =
+                ItemTouchHelper(
+                    SwipeToDeleteCallback(
+                        actionEmitter
+                    )
+                )
+            itemTouchHelper.attachToRecyclerView(this)
         }
     }
 

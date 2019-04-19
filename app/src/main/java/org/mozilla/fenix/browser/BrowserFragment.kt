@@ -4,6 +4,8 @@
 
 package org.mozilla.fenix.browser
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -20,15 +22,17 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.android.synthetic.main.component_search.*
+import kotlinx.android.synthetic.main.fragment_browser.*
 import kotlinx.android.synthetic.main.fragment_browser.view.*
 import kotlinx.android.synthetic.main.fragment_search.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.browser.session.Session
-import mozilla.components.browser.toolbar.behavior.BrowserToolbarBottomBehavior
 import mozilla.components.feature.contextmenu.ContextMenuCandidate
 import mozilla.components.feature.contextmenu.ContextMenuFeature
 import mozilla.components.feature.downloads.DownloadsFeature
@@ -37,17 +41,20 @@ import mozilla.components.feature.session.FullScreenFeature
 import mozilla.components.feature.session.SessionFeature
 import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.feature.session.ThumbnailsFeature
+import mozilla.components.feature.sitepermissions.SitePermissions
 import mozilla.components.feature.sitepermissions.SitePermissionsFeature
 import mozilla.components.feature.sitepermissions.SitePermissionsRules
 import mozilla.components.support.base.feature.BackHandler
 import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
 import mozilla.components.support.ktx.android.view.enterToImmersiveMode
 import mozilla.components.support.ktx.android.view.exitImmersiveModeIfNeeded
+import mozilla.components.support.ktx.kotlin.toUri
 import org.mozilla.fenix.BrowsingModeManager
 import org.mozilla.fenix.DefaultThemeManager
 import org.mozilla.fenix.HomeActivity
 import org.mozilla.fenix.IntentReceiverActivity
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.FenixSnackbar
 import org.mozilla.fenix.components.FindInPageIntegration
 import org.mozilla.fenix.components.metrics.Event
 import org.mozilla.fenix.components.metrics.Event.BrowserMenuItemTapped.Item
@@ -58,7 +65,6 @@ import org.mozilla.fenix.components.toolbar.ToolbarIntegration
 import org.mozilla.fenix.components.toolbar.ToolbarMenu
 import org.mozilla.fenix.components.toolbar.ToolbarUIView
 import org.mozilla.fenix.customtabs.CustomTabsIntegration
-import org.mozilla.fenix.ext.asActivity
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.ext.requireComponents
 import org.mozilla.fenix.ext.share
@@ -67,14 +73,16 @@ import org.mozilla.fenix.mvi.ActionBusFactory
 import org.mozilla.fenix.mvi.getAutoDisposeObservable
 import org.mozilla.fenix.quickactionsheet.QuickActionAction
 import org.mozilla.fenix.quickactionsheet.QuickActionComponent
+import org.mozilla.fenix.settings.quicksettings.QuickSettingsSheetDialogFragment
 import org.mozilla.fenix.utils.ItsNotBrokenSnack
 import org.mozilla.fenix.utils.Settings
-import org.mozilla.fenix.settings.quicksettings.QuickSettingsSheetDialogFragment
+import kotlin.coroutines.CoroutineContext
 
 @SuppressWarnings("TooManyFunctions", "LargeClass")
-class BrowserFragment : Fragment(), BackHandler {
+class BrowserFragment : Fragment(), BackHandler, CoroutineScope {
     private lateinit var toolbarComponent: ToolbarComponent
 
+    private var sessionObserver: Session.Observer? = null
     private val sessionFeature = ViewBoundFeatureWrapper<SessionFeature>()
     private val contextMenuFeature = ViewBoundFeatureWrapper<ContextMenuFeature>()
     private val downloadsFeature = ViewBoundFeatureWrapper<DownloadsFeature>()
@@ -85,8 +93,16 @@ class BrowserFragment : Fragment(), BackHandler {
     private val fullScreenFeature = ViewBoundFeatureWrapper<FullScreenFeature>()
     private val thumbnailsFeature = ViewBoundFeatureWrapper<ThumbnailsFeature>()
     private val customTabsIntegration = ViewBoundFeatureWrapper<CustomTabsIntegration>()
+    private lateinit var job: Job
 
     var sessionId: String? = null
+
+    override val coroutineContext: CoroutineContext get() = Dispatchers.IO + job
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        job = Job()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -110,20 +126,19 @@ class BrowserFragment : Fragment(), BackHandler {
             setBackgroundColor(
                 ContextCompat.getColor(
                     view.context,
-                    DefaultThemeManager.resolveAttribute(R.attr.browserToolbarBackground, context)
+                    DefaultThemeManager.resolveAttribute(R.attr.foundation, context)
                 )
             )
 
             (layoutParams as CoordinatorLayout.LayoutParams).apply {
-                // Stop toolbar from collapsing if TalkBack is enabled
-                val accessibilityManager = context
-                    ?.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+                gravity = getAppropriateLayoutGravity()
 
-                if (!accessibilityManager.isTouchExplorationEnabled) {
-                    behavior = BrowserToolbarBottomBehavior(view.context, null)
+                view.nestedScrollQuickAction.visibility = if (gravity == Gravity.TOP) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
                 }
 
-                gravity = Gravity.BOTTOM
                 height = (resources.displayMetrics.density * TOOLBAR_HEIGHT).toInt()
             }
         }
@@ -134,6 +149,16 @@ class BrowserFragment : Fragment(), BackHandler {
         DefaultThemeManager.applyStatusBarTheme(activity.window, activity.themeManager, activity, false)
 
         return view
+    }
+
+    private fun getAppropriateLayoutGravity(): Int {
+        sessionId?.let { sessionId ->
+            if (requireComponents.core.sessionManager.findSessionById(sessionId)?.isCustomTabSession() == true) {
+                return Gravity.TOP
+            }
+        }
+
+        return Gravity.BOTTOM
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -229,9 +254,11 @@ class BrowserFragment : Fragment(), BackHandler {
                         .show()
                     activity?.enterToImmersiveMode()
                     toolbar.visibility = View.GONE
+                    nestedScrollQuickAction.visibility = View.GONE
                 } else {
                     activity?.exitImmersiveModeIfNeeded()
                     toolbar.visibility = View.VISIBLE
+                    nestedScrollQuickAction.visibility = View.VISIBLE
                 }
             },
             owner = this,
@@ -245,28 +272,26 @@ class BrowserFragment : Fragment(), BackHandler {
         )
 
         val actionEmitter = ActionBusFactory.get(this).getManagedEmitter(SearchAction::class.java)
-        sessionId?.let { id ->
-            customTabsIntegration.set(
-                feature = CustomTabsIntegration(
-                    requireContext(),
-                    requireComponents.core.sessionManager,
-                    toolbar,
-                    id,
-                    requireActivity(),
-                    onItemTapped = { actionEmitter.onNext(SearchAction.ToolbarMenuItemTapped(it)) }
-                ),
-                owner = this,
-                view = view
-            )
+
+        sessionId?.let { sessionId ->
+            if (sessionManager.findSessionById(sessionId)?.isCustomTabSession() == true) {
+                customTabsIntegration.set(
+                    feature = CustomTabsIntegration(
+                        requireContext(),
+                        requireComponents.core.sessionManager,
+                        toolbar,
+                        sessionId,
+                        activity,
+                        onItemTapped = { actionEmitter.onNext(SearchAction.ToolbarMenuItemTapped(it)) }
+                    ),
+                    owner = this,
+                    view = view
+                )
+            }
         }
+
         toolbarComponent.getView().setOnSiteSecurityClickedListener {
-            val session = getSessionByIdOrUseSelectedSession()
-            val quickSettingsSheet = QuickSettingsSheetDialogFragment.newInstance(
-                url = session.url,
-                isSecured = session.securityInfo.secure,
-                isSiteInExceptionList = false
-            )
-            quickSettingsSheet.show(requireFragmentManager(), QuickSettingsSheetDialogFragment.FRAGMENT_TAG)
+            showQuickSettingsDialog()
         }
     }
 
@@ -278,15 +303,16 @@ class BrowserFragment : Fragment(), BackHandler {
     @Suppress("ComplexMethod")
     override fun onStart() {
         super.onStart()
+        sessionObserver = subscribeToSession()
         getAutoDisposeObservable<SearchAction>()
             .subscribe {
                 when (it) {
-                    is SearchAction.ToolbarTapped -> {
+                    is SearchAction.ToolbarClicked -> {
                         Navigation
                             .findNavController(toolbarComponent.getView())
                             .navigate(
                                 BrowserFragmentDirections.actionBrowserFragmentToSearchFragment(
-                                    requireComponents.core.sessionManager.selectedSession?.id
+                                    getSessionByIdOrUseSelectedSession().id
                                 )
                             )
 
@@ -297,6 +323,12 @@ class BrowserFragment : Fragment(), BackHandler {
                     is SearchAction.ToolbarMenuItemTapped -> {
                         trackToolbarItemInteraction(it)
                         handleToolbarItemInteraction(it)
+                    }
+                    is SearchAction.ToolbarLongClicked -> {
+                        getSessionByIdOrUseSelectedSession().copyUrl(requireContext())
+                        FenixSnackbar.make(view!!, Snackbar.LENGTH_LONG)
+                            .setText(resources.getString(R.string.url_copied))
+                            .show()
                     }
                 }
             }
@@ -312,8 +344,7 @@ class BrowserFragment : Fragment(), BackHandler {
                     }
                     is QuickActionAction.SharePressed -> {
                         requireComponents.analytics.metrics.track(Event.QuickActionSheetShareTapped)
-                        requireComponents.core.sessionManager
-                            .selectedSession?.url?.apply { requireContext().share(this) }
+                        getSessionByIdOrUseSelectedSession().url.apply { requireContext().share(this) }
                     }
                     is QuickActionAction.DownloadsPressed -> {
                         requireComponents.analytics.metrics.track(Event.QuickActionSheetDownloadTapped)
@@ -321,26 +352,27 @@ class BrowserFragment : Fragment(), BackHandler {
                     }
                     is QuickActionAction.BookmarkPressed -> {
                         requireComponents.analytics.metrics.track(Event.QuickActionSheetBookmarkTapped)
-                        val session = requireComponents.core.sessionManager.selectedSession
+                        val session = getSessionByIdOrUseSelectedSession()
                         CoroutineScope(IO).launch {
-                            requireComponents.core.bookmarksStorage
-                                .addItem(BookmarkRoot.Mobile.id, session!!.url, session.title, null)
+                            val guid = requireComponents.core.bookmarksStorage
+                                .addItem(BookmarkRoot.Mobile.id, session.url, session.title, null)
                             launch(Main) {
-                                val rootView =
-                                    context?.asActivity()?.window?.decorView?.findViewById<View>(android.R.id.content)
-                                rootView?.let { view ->
-                                    Snackbar.make(
-                                        view,
-                                        getString(R.string.bookmark_created_snackbar),
-                                        Snackbar.LENGTH_LONG
-                                    )
-                                        .setAction(getString(R.string.edit_bookmark_snackbar_action)) {
-                                            ItsNotBrokenSnack(
-                                                context!!
-                                            ).showSnackbar(issueNumber = "90")
-                                        }
-                                        .show()
-                                }
+                                requireComponents.analytics.metrics.track(Event.AddBookmark)
+                                FenixSnackbar.make(
+                                    view!!,
+                                    Snackbar.LENGTH_LONG
+                                )
+                                    .setAction(getString(R.string.edit_bookmark_snackbar_action)) {
+                                        Navigation.findNavController(requireActivity(), R.id.container)
+                                            .navigate(
+                                                BrowserFragmentDirections
+                                                    .actionBrowserFragmentToBookmarkEditFragment(
+                                                        guid
+                                                    )
+                                            )
+                                    }
+                                    .setText(getString(R.string.bookmark_saved_snackbar))
+                                    .show()
                             }
                         }
                     }
@@ -353,11 +385,17 @@ class BrowserFragment : Fragment(), BackHandler {
         assignSitePermissionsRules()
     }
 
+    override fun onStop() {
+        super.onStop()
+        sessionObserver?.let {
+            requireComponents.core.sessionManager.selectedSession?.unregister(it)
+        }
+    }
+
     override fun onBackPressed(): Boolean {
         return when {
             findInPageIntegration.onBackPressed() -> true
             sessionFeature.onBackPressed() -> true
-            customTabsIntegration.onBackPressed() -> true
             else -> false
         }
     }
@@ -378,6 +416,11 @@ class BrowserFragment : Fragment(), BackHandler {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         promptsFeature.withFeature { it.onActivityResult(requestCode, resultCode, data) }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        job.cancel()
     }
 
     // This method triggers the complexity warning. However it's actually not that hard to understand.
@@ -403,6 +446,7 @@ class BrowserFragment : Fragment(), BackHandler {
 
         requireComponents.analytics.metrics.track(Event.BrowserMenuItemTapped(item))
     }
+
     // This method triggers the complexity warning. However it's actually not that hard to understand.
     @SuppressWarnings("ComplexMethod")
     private fun handleToolbarItemInteraction(action: SearchAction.ToolbarMenuItemTapped) {
@@ -417,8 +461,7 @@ class BrowserFragment : Fragment(), BackHandler {
             ToolbarMenu.Item.Library -> Navigation.findNavController(toolbarComponent.getView())
                 .navigate(BrowserFragmentDirections.actionBrowserFragmentToLibraryFragment())
             is ToolbarMenu.Item.RequestDesktop -> sessionUseCases.requestDesktopSite.invoke(action.item.isChecked)
-            ToolbarMenu.Item.Share -> requireComponents.core.sessionManager
-                .selectedSession?.url?.apply { requireContext().share(this) }
+            ToolbarMenu.Item.Share -> getSessionByIdOrUseSelectedSession().url.apply { requireContext().share(this) }
             ToolbarMenu.Item.NewPrivateTab -> {
                 val directions = BrowserFragmentDirections
                     .actionBrowserFragmentToSearchFragment(null)
@@ -429,8 +472,7 @@ class BrowserFragment : Fragment(), BackHandler {
                 FindInPageIntegration.launch?.invoke()
                 requireComponents.analytics.metrics.track(Event.FindInPageOpened)
             }
-            ToolbarMenu.Item.ReportIssue -> requireComponents.core.sessionManager
-                .selectedSession?.url?.apply {
+            ToolbarMenu.Item.ReportIssue -> getSessionByIdOrUseSelectedSession().url.apply {
                 val reportUrl = String.format(REPORT_SITE_ISSUE_URL, this)
                 sessionUseCases.loadUrl.invoke(reportUrl)
             }
@@ -457,13 +499,34 @@ class BrowserFragment : Fragment(), BackHandler {
     private fun assignSitePermissionsRules() {
         val settings = Settings.getInstance(requireContext())
 
-        val rules: SitePermissionsRules = if (settings.shouldRecommendedSettingsBeActivated) {
-            settings.getSitePermissionsRecommendedSettingsRules()
-        } else {
-            settings.getSitePermissionsCustomSettingsRules()
-        }
+        val rules: SitePermissionsRules = settings.getSitePermissionsCustomSettingsRules()
+
         sitePermissionsFeature.withFeature {
             it.sitePermissionsRules = rules
+        }
+    }
+
+    private fun showQuickSettingsDialog() {
+        val session = getSessionByIdOrUseSelectedSession()
+        val host = requireNotNull(session.url.toUri().host)
+
+        launch {
+            val storage = requireContext().components.storage
+            val sitePermissions: SitePermissions? = storage.findSitePermissionsBy(host)
+
+            launch(Main) {
+                val quickSettingsSheet = QuickSettingsSheetDialogFragment.newInstance(
+                    url = session.url,
+                    isSecured = session.securityInfo.secure,
+                    isTrackingProtectionOn = Settings.getInstance(context!!).shouldUseTrackingProtection,
+                    sitePermissions = sitePermissions
+                )
+                quickSettingsSheet.sitePermissions = sitePermissions
+                quickSettingsSheet.show(
+                    requireFragmentManager(),
+                    QuickSettingsSheetDialogFragment.FRAGMENT_TAG
+                )
+            }
         }
     }
 
@@ -475,11 +538,45 @@ class BrowserFragment : Fragment(), BackHandler {
         }
     }
 
+    private fun Session.copyUrl(context: Context) {
+        val clipBoard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val uri = Uri.parse(url)
+        clipBoard.primaryClip = ClipData.newRawUri("Uri", uri)
+    }
+
+    private fun subscribeToSession(): Session.Observer {
+        val observer = object : Session.Observer {
+            override fun onLoadingStateChanged(session: Session, loading: Boolean) {
+                super.onLoadingStateChanged(session, loading)
+                setToolbarBehavior(loading)
+            }
+        }
+        requireComponents.core.sessionManager.selectedSession?.register(observer)
+        return observer
+    }
+
+    private fun setToolbarBehavior(loading: Boolean) {
+        val toolbarView = toolbarComponent.uiView.view
+        (toolbarView.layoutParams as CoordinatorLayout.LayoutParams).apply {
+            // Stop toolbar from collapsing if TalkBack is enabled or page is loading
+            val accessibilityManager = context
+                ?.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+            if (!accessibilityManager.isTouchExplorationEnabled) {
+                if (!loading) {
+                    behavior = BrowserToolbarBottomBehavior(context, null)
+                } else {
+                    (behavior as? BrowserToolbarBottomBehavior)?.forceExpand(toolbarView)
+                    behavior = null
+                }
+            }
+        }
+    }
+
     companion object {
         private const val REQUEST_CODE_DOWNLOAD_PERMISSIONS = 1
         private const val REQUEST_CODE_PROMPT_PERMISSIONS = 2
         private const val REQUEST_CODE_APP_PERMISSIONS = 3
         private const val TOOLBAR_HEIGHT = 56f
-        private const val REPORT_SITE_ISSUE_URL = "https://webcompat.com/issues/new?url=%s&label=browser-fenix"
+        const val REPORT_SITE_ISSUE_URL = "https://webcompat.com/issues/new?url=%s&label=browser-fenix"
     }
 }

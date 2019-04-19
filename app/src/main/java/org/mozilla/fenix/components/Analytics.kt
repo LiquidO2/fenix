@@ -15,9 +15,10 @@ import mozilla.components.lib.crash.service.SentryService
 import org.mozilla.fenix.BuildConfig
 import org.mozilla.fenix.HomeActivity
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.metrics.AdjustMetricsService
 import org.mozilla.fenix.components.metrics.GleanMetricsService
 import org.mozilla.fenix.components.metrics.LeanplumMetricsService
-import org.mozilla.fenix.components.metrics.Metrics
+import org.mozilla.fenix.components.metrics.MetricController
 import org.mozilla.fenix.utils.Settings
 import org.mozilla.geckoview.BuildConfig.MOZ_APP_BUILDID
 import org.mozilla.geckoview.BuildConfig.MOZ_APP_VERSION
@@ -68,11 +69,12 @@ class Analytics(
         )
     }
 
-    val metrics: Metrics by lazy {
-        Metrics(
+    val metrics: MetricController by lazy {
+        MetricController.create(
             listOf(
                 GleanMetricsService(context),
-                LeanplumMetricsService(context as Application)
+                LeanplumMetricsService(context as Application),
+                AdjustMetricsService(context)
             ),
             isTelemetryEnabled = { Settings.getInstance(context).isTelemetryEnabled }
         )

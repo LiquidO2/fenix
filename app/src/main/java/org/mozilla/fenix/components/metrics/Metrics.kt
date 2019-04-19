@@ -3,10 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mozilla.fenix.components.metrics
 
+import mozilla.components.browser.search.SearchEngine
 import mozilla.components.support.base.Component
 import mozilla.components.support.base.facts.Fact
 import mozilla.components.support.base.facts.FactProcessor
 import mozilla.components.support.base.facts.Facts
+import mozilla.components.support.base.log.logger.Logger
 import org.mozilla.fenix.BuildConfig
 
 sealed class Event {
@@ -49,12 +51,25 @@ sealed class Event {
     object AddBookmark : Event()
     object RemoveBookmark : Event()
     object OpenedBookmark : Event()
+    object OpenedBookmarkInNewTab : Event()
+    object OpenedBookmarksInNewTabs : Event()
+    object OpenedBookmarkInPrivateTab : Event()
+    object OpenedBookmarksInPrivateTabs : Event()
+    object EditedBookmark : Event()
+    object MovedBookmark : Event()
+    object ShareBookmark : Event()
+    object CopyBookmark : Event()
+    object AddBookmarkFolder : Event()
+    object RemoveBookmarks : Event()
     object QuickActionSheetOpened : Event()
     object QuickActionSheetClosed : Event()
     object QuickActionSheetShareTapped : Event()
     object QuickActionSheetBookmarkTapped : Event()
     object QuickActionSheetDownloadTapped : Event()
     object QuickActionSheetReadTapped : Event()
+    object CustomTabsClosed : Event()
+    object CustomTabsActionTapped : Event()
+    object CustomTabsMenuOpened : Event()
 
     // Interaction Events
     data class SearchBarTapped(val source: Source) : Event() {
@@ -68,10 +83,49 @@ sealed class Event {
             get() = mapOf("autocomplete" to autoCompleted.toString())
     }
 
-    data class PerformedSearch(val fromSearchSuggestion: Boolean, val fromSearchShortcut: Boolean) : Event() {
+    data class PerformedSearch(val eventSource: EventSource) : Event() {
+        sealed class EngineSource {
+            data class Default(val engine: SearchEngine) : EngineSource()
+            data class Shortcut(val engine: SearchEngine) : EngineSource()
+
+            val searchEngine: SearchEngine
+                get() = when (this) {
+                    is Default -> engine
+                    is Shortcut -> engine
+                }
+
+            val descriptor: String
+                get() = when (this) {
+                    is Default -> "default"
+                    is Shortcut -> "shortcut"
+                }
+        }
+
+        sealed class EventSource {
+            data class Suggestion(val engineSource: EngineSource) : EventSource()
+            data class Action(val engineSource: EngineSource) : EventSource()
+
+            private val source: EngineSource
+                get() = when (this) {
+                    is Suggestion -> engineSource
+                    is Action -> engineSource
+                }
+
+            private val label: String
+                get() = when (this) {
+                    is Suggestion -> "suggestion"
+                    is Action -> "action"
+                }
+
+            val countLabel: String
+                get() = "${source.searchEngine.identifier}.$label"
+
+            val sourceLabel: String
+                get() = "${source.descriptor}.$label"
+        }
+
         override val extras: Map<String, String>?
-            get() = mapOf("search_suggestion" to fromSearchSuggestion.toString(),
-                "search_shortcut" to fromSearchShortcut.toString())
+            get() = mapOf("source" to eventSource.sourceLabel)
     }
 
     // Track only built-in engine selection. Do not track user-added engines!
@@ -121,10 +175,13 @@ sealed class Event {
             get() = mapOf("item" to item.toString().toLowerCase())
     }
 
+    sealed class Search
+
     open val extras: Map<String, String>?
         get() = null
 }
 
+@Suppress("ComplexMethod")
 private fun Fact.toEvent(): Event? = when (Pair(component, item)) {
     Pair(Component.FEATURE_FINDINPAGE, "previous") -> Event.FindInPagePrevious
     Pair(Component.FEATURE_FINDINPAGE, "next") -> Event.FindInPageNext
@@ -133,6 +190,12 @@ private fun Fact.toEvent(): Event? = when (Pair(component, item)) {
     Pair(Component.FEATURE_CONTEXTMENU, "item") -> {
         metadata?.get("item")?.let { Event.ContextMenuItemTapped.create(it.toString()) }
     }
+
+    Pair(Component.FEATURE_TOOLBAR, "menu") -> {
+        metadata?.get("customTab")?.let { Event.CustomTabsMenuOpened }
+    }
+    Pair(Component.FEATURE_CUSTOMTABS, "close") -> Event.CustomTabsClosed
+    Pair(Component.FEATURE_CUSTOMTABS, "action_button") -> Event.CustomTabsActionTapped
 
     else -> null
 }
@@ -144,7 +207,37 @@ interface MetricsService {
     fun shouldTrack(event: Event): Boolean
 }
 
-class Metrics(private val services: List<MetricsService>, private val isTelemetryEnabled: () -> Boolean) {
+interface MetricController {
+    fun start()
+    fun stop()
+    fun track(event: Event)
+
+    companion object {
+        fun create(services: List<MetricsService>, isTelemetryEnabled: () -> Boolean): MetricController {
+            return if (BuildConfig.TELEMETRY) return ReleaseMetricController(services, isTelemetryEnabled)
+            else DebugMetricController()
+        }
+    }
+}
+
+private class DebugMetricController : MetricController {
+    override fun start() {
+        Logger.debug("DebugMetricController: start")
+    }
+
+    override fun stop() {
+        Logger.debug("DebugMetricController: stop")
+    }
+
+    override fun track(event: Event) {
+        Logger.debug("DebugMetricController: track event: $event")
+    }
+}
+
+private class ReleaseMetricController(
+    private val services: List<MetricsService>,
+    private val isTelemetryEnabled: () -> Boolean
+) : MetricController {
     private var initialized = false
 
     init {
@@ -157,22 +250,22 @@ class Metrics(private val services: List<MetricsService>, private val isTelemetr
         })
     }
 
-    fun start() {
-        if (BuildConfig.TELEMETRY && !isTelemetryEnabled.invoke() || initialized) { return }
+    override fun start() {
+        if (!isTelemetryEnabled.invoke() || initialized) { return }
 
         services.forEach { it.start() }
         initialized = true
     }
 
-    fun stop() {
+    override fun stop() {
         if (!initialized) { return }
 
         services.forEach { it.stop() }
         initialized = false
     }
 
-    fun track(event: Event) {
-        if (BuildConfig.TELEMETRY && !isTelemetryEnabled.invoke() && !initialized) { return }
+    override fun track(event: Event) {
+        if (!isTelemetryEnabled.invoke() && !initialized) { return }
 
         services
             .filter { it.shouldTrack(event) }

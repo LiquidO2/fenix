@@ -18,7 +18,6 @@ import kotlinx.android.synthetic.main.fragment_library.*
 import mozilla.appservices.places.BookmarkRoot
 import org.mozilla.fenix.R
 import org.mozilla.fenix.library.bookmarks.BookmarkFragmentArgs
-import org.mozilla.fenix.utils.ItsNotBrokenSnack
 
 class LibraryFragment : Fragment() {
 
@@ -37,6 +36,7 @@ class LibraryFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        (activity as AppCompatActivity).title = getString(R.string.library_title)
         (activity as AppCompatActivity).supportActionBar?.show()
     }
 
@@ -54,19 +54,6 @@ class LibraryFragment : Fragment() {
             LibraryFragmentDirections.actionLibraryFragmentToBookmarksFragment(BookmarkRoot.Root.id).actionId,
             BookmarkFragmentArgs(BookmarkRoot.Root.id).toBundle()
         ))
-
-        libraryDownloads.setOnClickListener {
-            ItsNotBrokenSnack(context!!).showSnackbar(issueNumber = "348")
-        }
-        libraryScreenshots.setOnClickListener {
-            ItsNotBrokenSnack(context!!).showSnackbar(issueNumber = "89")
-        }
-        libraryReadingList.setOnClickListener {
-            ItsNotBrokenSnack(context!!).showSnackbar(issueNumber = "913")
-        }
-        librarySessions.setOnClickListener {
-            ItsNotBrokenSnack(context!!).showSnackbar(issueNumber = "637")
-        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -77,11 +64,6 @@ class LibraryFragment : Fragment() {
         return when (item.itemId) {
             R.id.libraryClose -> {
                 Navigation.findNavController(requireActivity(), R.id.container).navigateUp()
-                true
-            }
-            R.id.librarySearch -> {
-                // TODO Library Search
-                ItsNotBrokenSnack(context!!).showSnackbar(issueNumber = "1118")
                 true
             }
             else -> super.onOptionsItemSelected(item)

@@ -6,12 +6,13 @@ package org.mozilla.fenix.library.bookmarks
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import android.widget.LinearLayout
 import io.reactivex.Observable
 import io.reactivex.Observer
 import io.reactivex.functions.Consumer
+import kotlinx.android.synthetic.main.component_bookmark.view.*
 import mozilla.appservices.places.BookmarkRoot
+import mozilla.components.concept.storage.BookmarkNode
 import mozilla.components.support.base.feature.BackHandler
 import org.mozilla.fenix.R
 import org.mozilla.fenix.mvi.UIView
@@ -29,23 +30,25 @@ class BookmarkUIView(
 
     var canGoBack = false
 
-    override val view: RecyclerView = LayoutInflater.from(container.context)
-        .inflate(R.layout.component_bookmark, container, true)
-        .findViewById(R.id.bookmark_list)
+    override val view: LinearLayout = LayoutInflater.from(container.context)
+        .inflate(R.layout.component_bookmark, container, true) as LinearLayout
 
-    private val bookmarkAdapter = BookmarkAdapter(actionEmitter)
+    private val bookmarkAdapter: BookmarkAdapter
 
     init {
-        view.apply {
+        view.bookmark_list.apply {
+            bookmarkAdapter = BookmarkAdapter(view.bookmarks_empty_view, actionEmitter)
             adapter = bookmarkAdapter
-            layoutManager = LinearLayoutManager(container.context)
         }
     }
 
     override fun updateView() = Consumer<BookmarkState> {
         canGoBack = !(listOf(null, BookmarkRoot.Root.id).contains(it.tree?.guid))
         bookmarkAdapter.updateData(it.tree, it.mode)
-        mode = it.mode
+        if (it.mode != mode) {
+            mode = it.mode
+            actionEmitter.onNext(BookmarkAction.ModeChanged)
+        }
     }
 
     override fun onBackPressed(): Boolean {
@@ -54,4 +57,6 @@ class BookmarkUIView(
             true
         } else false
     }
+
+    fun getSelected(): Set<BookmarkNode> = bookmarkAdapter.selected
 }

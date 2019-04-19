@@ -4,11 +4,14 @@
 
 package org.mozilla.fenix
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.preference.PreferenceManager
 import android.util.AttributeSet
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.navigation.fragment.NavHostFragment
@@ -27,6 +30,7 @@ import org.mozilla.fenix.components.metrics.Event
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.home.HomeFragmentDirections
 import org.mozilla.fenix.library.bookmarks.BookmarkFragmentDirections
+import org.mozilla.fenix.library.bookmarks.selectfolder.SelectBookmarkFolderFragmentDirections
 import org.mozilla.fenix.library.history.HistoryFragmentDirections
 import org.mozilla.fenix.search.SearchFragmentDirections
 import org.mozilla.fenix.settings.SettingsFragmentDirections
@@ -51,10 +55,14 @@ open class HomeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        themeManager.temporaryThemeManagerStorage =
+            when (PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean(this.getString(R.string.pref_key_private_mode), false)) {
+                true -> ThemeManager.Theme.Private
+                false -> ThemeManager.Theme.Normal
+            }
         setTheme(themeManager.currentTheme)
         DefaultThemeManager.applyStatusBarTheme(window, themeManager, this)
-        components.core.setEnginePreferredColorScheme()
-
         browsingModeManager = DefaultBrowsingModeManager(this)
 
         setContentView(R.layout.activity_home)
@@ -81,10 +89,7 @@ open class HomeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // No session or timed out; we should try to pop inclusive to browser if not in private mode
-        if (components.core.sessionStorage.current() == null && !browsingModeManager.isPrivate) {
-            navHost.navController.popBackStack(R.id.browserFragment, true)
-        }
+        showSoftwareKeyboardIfNecessary()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -111,6 +116,29 @@ open class HomeActivity : AppCompatActivity() {
             }
         }
         super.onBackPressed()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        hideSoftwareKeyboardIfNecessary()
+    }
+
+    private fun showSoftwareKeyboardIfNecessary() {
+        if (navHost.navController.currentDestination?.id != R.id.searchFragment) { return }
+        (getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager).apply {
+            currentFocus?.also {
+                this.showSoftInput(it, 0)
+            }
+        }
+    }
+
+    private fun hideSoftwareKeyboardIfNecessary() {
+        if (navHost.navController.currentDestination?.id != R.id.searchFragment) { return }
+        (getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager).apply {
+            currentFocus?.also {
+                this.hideSoftInputFromWindow(it.windowToken, 0)
+            }
+        }
     }
 
     private fun handleCrashIfNecessary(intent: Intent?) {
@@ -155,6 +183,8 @@ open class HomeActivity : AppCompatActivity() {
                 SettingsFragmentDirections.actionSettingsFragmentToBrowserFragment(sessionId)
             BrowserDirection.FromBookmarks ->
                 BookmarkFragmentDirections.actionBookmarkFragmentToBrowserFragment(sessionId)
+            BrowserDirection.FromBookmarksFolderSelect ->
+                SelectBookmarkFolderFragmentDirections.actionBookmarkSelectFolderFragmentToBrowserFragment(sessionId)
             BrowserDirection.FromHistory ->
                 HistoryFragmentDirections.actionHistoryFragmentToBrowserFragment(sessionId)
         }
@@ -193,5 +223,5 @@ open class HomeActivity : AppCompatActivity() {
 }
 
 enum class BrowserDirection {
-    FromGlobal, FromHome, FromSearch, FromSettings, FromBookmarks, FromHistory
+    FromGlobal, FromHome, FromSearch, FromSettings, FromBookmarks, FromBookmarksFolderSelect, FromHistory
 }

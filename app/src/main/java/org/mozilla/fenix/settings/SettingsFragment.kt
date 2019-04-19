@@ -47,6 +47,7 @@ import org.mozilla.fenix.R.string.pref_key_theme
 import org.mozilla.fenix.R.string.pref_key_account
 import org.mozilla.fenix.R.string.pref_key_account_category
 import org.mozilla.fenix.R.string.pref_key_search_engine_settings
+import org.mozilla.fenix.R.string.pref_key_tracking_protection_settings
 import org.mozilla.fenix.utils.ItsNotBrokenSnack
 
 @SuppressWarnings("TooManyFunctions")
@@ -58,6 +59,7 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         job = Job()
+        updateSignInVisibility()
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -67,6 +69,7 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
     override fun onResume() {
         super.onResume()
 
+        (activity as AppCompatActivity).title = getString(R.string.settings_title)
         (activity as AppCompatActivity).supportActionBar?.show()
         val defaultBrowserPreference =
             findPreference<DefaultBrowserPreference>(getString(R.string.pref_key_make_default_browser))
@@ -76,6 +79,16 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
             findPreference<Preference>(getString(R.string.pref_key_search_engine_settings))
         searchEnginePreference?.summary = context?.let {
             requireComponents.search.searchEngineManager.getDefaultSearchEngine(it).name
+        }
+
+        val trackingProtectionPreference =
+            findPreference<Preference>(getString(R.string.pref_key_tracking_protection_settings))
+        trackingProtectionPreference?.summary = context?.let {
+            if (org.mozilla.fenix.utils.Settings.getInstance(it).shouldUseTrackingProtection) {
+                getString(R.string.tracking_protection_on)
+            } else {
+                getString(R.string.tracking_protection_off)
+            }
         }
 
         val themesPreference =
@@ -97,6 +110,9 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
         when (preference.key) {
             resources.getString(pref_key_search_engine_settings) -> {
                 navigateToSearchEngineSettings()
+            }
+            resources.getString(pref_key_tracking_protection_settings) -> {
+                navigateToTrackingProtectionSettings()
             }
             resources.getString(pref_key_site_permissions) -> {
                 navigateToSitePermissions()
@@ -146,9 +162,6 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
         // Observe account changes to keep the UI up-to-date.
         accountManager.register(this, owner = this)
 
-        // TODO an authenticated state will mark 'preferenceSignIn' as invisible; currently that behaviour is non-ideal:
-        // a "sign in" UI will be displayed at first, and then quickly animate away.
-        // Ideally we don't want it to be displayed at all.
         updateAuthState(accountManager.authenticatedAccount())
         accountManager.accountProfile()?.let { updateAccountProfile(it) }
     }
@@ -220,6 +233,11 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
         Navigation.findNavController(view!!).navigate(directions)
     }
 
+    private fun navigateToTrackingProtectionSettings() {
+        val directions = SettingsFragmentDirections.actionSettingsFragmentToTrackingProtectionFragment()
+        Navigation.findNavController(view!!).navigate(directions)
+    }
+
     private fun navigateToThemeSettings() {
         val directions = SettingsFragmentDirections.actionSettingsFragmentToThemeFragment()
         Navigation.findNavController(view!!).navigate(directions)
@@ -273,6 +291,7 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
 
     override fun onLoggedOut() {
         updateAuthState()
+        updateSignInVisibility()
     }
 
     override fun onProfileUpdated(profile: Profile) {
@@ -281,6 +300,12 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
 
     // --- Account UI helpers ---
     private fun updateAuthState(account: OAuthAccount? = null) {
+        // Cache the user's auth state to improve performance of sign in visibility
+        org.mozilla.fenix.utils.Settings.getInstance(context!!).setHasCachedAccount(account != null)
+    }
+
+    private fun updateSignInVisibility() {
+        val hasCachedAccount = org.mozilla.fenix.utils.Settings.getInstance(context!!).hasCachedAccount
         val preferenceSignIn =
             findPreference<Preference>(context!!.getPreferenceKey(pref_key_sign_in))
         val preferenceFirefoxAccount =
@@ -288,7 +313,7 @@ class SettingsFragment : PreferenceFragmentCompat(), CoroutineScope, AccountObse
         val accountPreferenceCategory =
             findPreference<PreferenceCategory>(context!!.getPreferenceKey(pref_key_account_category))
 
-        if (account != null) {
+        if (hasCachedAccount) {
             preferenceSignIn?.isVisible = false
             preferenceSignIn?.onPreferenceClickListener = null
             preferenceFirefoxAccount?.isVisible = true
